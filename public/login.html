@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kollekta Meta-admin — Σύνδεση</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-shell">
+      <div class="login-card">
+        <p class="login-eyebrow">Kollekta</p>
+        <h1>Meta-admin</h1>
+        <p class="subtitle">Σύνδεση ιδιοκτήτη</p>
+        <form id="login-form">
+          <label for="password">Κωδικός πρόσβασης</label>
+          <input type="password" id="password" placeholder="Κωδικός" required autocomplete="current-password" autofocus>
+          <p id="login-error" class="status-line error hidden"></p>
+          <button type="submit" class="btn btn-primary">Σύνδεση</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('login-error');
+      err.classList.add('hidden');
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          password: document.getElementById('password').value,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        err.textContent = data.error || 'Λάθος κωδικός.';
+        err.classList.remove('hidden');
+        return;
+      }
+      location.href = '/';
+    });
+  </script>
+</body>
+</html>

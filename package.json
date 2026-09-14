@@ -1,0 +1,21 @@
+{
+  "name": "kollekta-meta-admin",
+  "version": "1.0.0",
+  "description": "Kollekta meta-admin — provision customer instances on the host",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "GPL-3.0",
+  "type": "commonjs",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.2.1"
+  }
+}

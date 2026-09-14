@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kollekta Meta-admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand-wrap">
+          <h1>Kollekta Meta-admin</h1>
+          <nav class="top-nav">
+            <a href="/" class="nav-btn active">Πελάτες</a>
+          </nav>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" id="logout-btn" class="btn btn-ghost">Αποσύνδεση</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app">
+      <section class="view">
+        <div class="page-hero">
+          <h2>Πελάτες</h2>
+          <p class="view-subtitle">Λίστα πελατών — θα συμπληρωθεί στα M2/M3.</p>
+        </div>
+        <div class="empty-state" id="clients-empty">
+          <p>Δεν υπάρχουν πελάτες ακόμη.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
