@@ -6,7 +6,7 @@
   <title>Kollekta Meta-admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
         <div class="brand-wrap">
           <h1>Kollekta Meta-admin</h1>
           <nav class="top-nav">
-            <a href="/" class="nav-btn active">Πελάτες</a>
+            <a href="/" class="nav-btn active" id="nav-clients">Πελάτες</a>
           </nav>
         </div>
         <div class="topbar-actions">
@@ -26,17 +26,185 @@
     </header>
 
     <main class="app">
-      <section class="view">
+      <section class="view" id="view-list">
         <div class="page-hero">
-          <h2>Πελάτες</h2>
-          <p class="view-subtitle">Λίστα πελατών — θα συμπληρωθεί στα M2/M3.</p>
+          <div>
+            <h2>Πελάτες</h2>
+            <p class="view-subtitle">Ενεργές και draft instances στο host.</p>
+          </div>
+          <button type="button" id="new-client-btn" class="btn btn-primary">Νέος πελάτης</button>
         </div>
-        <div class="empty-state" id="clients-empty">
+        <div class="empty-state hidden" id="clients-empty">
           <p>Δεν υπάρχουν πελάτες ακόμη.</p>
+        </div>
+        <div class="table-wrap hidden" id="clients-table-wrap">
+          <table class="data-table" id="clients-table">
+            <thead>
+              <tr>
+                <th>Επωνυμία</th>
+                <th>Subdomain</th>
+                <th>Πακέτο</th>
+                <th>Κατάσταση</th>
+                <th>Τίμημα</th>
+                <th>Ημ/νία</th>
+              </tr>
+            </thead>
+            <tbody id="clients-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="view hidden" id="view-detail">
+        <div class="page-hero">
+          <div>
+            <h2 id="detail-title">Πελάτης</h2>
+            <p class="view-subtitle" id="detail-subtitle"></p>
+          </div>
+          <button type="button" id="detail-back-btn" class="btn btn-ghost">← Πίσω</button>
+        </div>
+        <div class="detail-panel" id="detail-panel"></div>
+      </section>
+
+      <section class="view hidden" id="view-new">
+        <div class="page-hero">
+          <div>
+            <h2>Νέος πελάτης</h2>
+            <p class="view-subtitle">Δημιουργία draft και άμεσο provisioning.</p>
+          </div>
+          <button type="button" id="back-to-list-btn" class="btn btn-ghost">← Πίσω</button>
+        </div>
+
+        <form id="new-client-form" class="client-form" novalidate>
+          <div class="form-grid">
+            <label class="field">
+              <span>Επωνυμία *</span>
+              <input type="text" name="business_name" required autocomplete="organization">
+            </label>
+
+            <label class="field">
+              <span>Subdomain *</span>
+              <input type="text" name="subdomain" id="subdomain-input" required spellcheck="false" autocomplete="off" placeholder="nomapelati">
+              <span class="field-hint" id="subdomain-hint">Μόνο πεζά λατινικά, αριθμοί και παύλα.</span>
+            </label>
+
+            <label class="field">
+              <span>Πακέτο *</span>
+              <select name="plan" id="plan-select" required>
+                <option value="basic">Basic</option>
+                <option value="pro">Pro</option>
+                <option value="business">Business</option>
+              </select>
+            </label>
+
+            <div class="plan-preview" id="plan-preview" aria-live="polite"></div>
+
+            <label class="field">
+              <span>Όνομα επικοινωνίας</span>
+              <input type="text" name="contact_name" autocomplete="name">
+            </label>
+
+            <label class="field">
+              <span>Email επικοινωνίας</span>
+              <input type="email" name="contact_email" autocomplete="email">
+            </label>
+
+            <label class="field">
+              <span>Τηλέφωνο επικοινωνίας</span>
+              <input type="tel" name="contact_phone" autocomplete="tel">
+            </label>
+
+            <label class="field">
+              <span>Λογότυπο</span>
+              <input type="file" name="logo" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml">
+              <span class="field-hint">png / svg / jpg, μέχρι 2MB</span>
+            </label>
+
+            <label class="field">
+              <span>Ετήσιο τίμημα (€)</span>
+              <input type="number" name="annual_price_eur" id="price-input" min="0" step="1">
+              <span class="field-hint" id="discount-preview"></span>
+            </label>
+
+            <label class="field field-span">
+              <span>Σημείωση έκπτωσης</span>
+              <input type="text" name="discount_note" id="discount-note" placeholder="π.χ. -30% lifetime, testimonial">
+            </label>
+          </div>
+
+          <p id="form-error" class="status-line error hidden"></p>
+
+          <div class="confirm-box" id="confirm-create-box">
+            <p class="confirm-title">Επιβεβαίωση provisioning</p>
+            <p class="confirm-copy">Θα γραφτεί nginx config και θα ξεκινήσει container. Πληκτρολόγησε το subdomain για επιβεβαίωση:</p>
+            <label class="field">
+              <span>Επιβεβαίωση subdomain *</span>
+              <input type="text" id="confirm-subdomain-input" name="confirm_subdomain" spellcheck="false" autocomplete="off" placeholder="ίδιο με το subdomain">
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="submit-client-btn">Δημιουργία &amp; provisioning</button>
+          </div>
+        </form>
+
+        <div class="provision-panel hidden" id="provision-panel">
+          <div class="provision-head">
+            <div class="spinner" aria-hidden="true"></div>
+            <div>
+              <h3 id="provision-title">Provisioning…</h3>
+              <p class="view-subtitle" id="provision-subtitle">Μην κλείσεις τη σελίδα και μην ξαναυποβάλεις τη φόρμα.</p>
+            </div>
+          </div>
+          <ol class="provision-steps" id="provision-steps"></ol>
+          <p id="provision-error" class="status-line error hidden"></p>
+          <button type="button" class="btn btn-secondary hidden" id="provision-done-btn">Επιστροφή στη λίστα</button>
+        </div>
+
+        <div class="success-panel hidden" id="success-panel">
+          <h2 id="success-title">Ο πελάτης είναι έτοιμος.</h2>
+          <p class="success-url-label">URL</p>
+          <p class="success-url"><a id="success-admin-link" href="#" target="_blank" rel="noopener"></a></p>
+
+          <p class="success-url-label">Admin password</p>
+          <p class="code-reveal mono" id="success-password"></p>
+          <button type="button" class="btn btn-secondary" id="copy-password-btn">Αντιγραφή</button>
+          <p class="success-reminder">
+            Αυτός ο κωδικός δεν θα ξαναφανεί εδώ — αν χαθεί, θα χρειαστεί reset από το admin panel του instance.
+          </p>
+
+          <div class="success-checklist">
+            <p class="success-url-label">Φάση 4 — χειροκίνητα επόμενα βήματα</p>
+            <pre id="success-checklist" class="checklist-text"></pre>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="success-done-btn">Στη λίστα πελατών</button>
+          </div>
         </div>
       </section>
     </main>
   </div>
+
+  <div class="modal-backdrop hidden" id="action-modal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <h3 id="modal-title">Επιβεβαίωση</h3>
+      <p id="modal-body" class="modal-body"></p>
+      <label class="field" id="modal-confirm-field">
+        <span>Πληκτρολόγησε το subdomain</span>
+        <input type="text" id="modal-confirm-input" spellcheck="false" autocomplete="off">
+      </label>
+      <label class="check-row hidden" id="modal-export-row">
+        <input type="checkbox" id="modal-export-ack">
+        <span>Έγινε export πρώτα (<code>kollekta-export &lt;subdomain&gt;</code>) — GDPR / καλή πρακτική.</span>
+      </label>
+      <p id="modal-error" class="status-line error hidden"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="modal-cancel-btn">Άκυρο</button>
+        <button type="button" class="btn btn-primary" id="modal-ok-btn">Συνέχεια</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>

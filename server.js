@@ -5,6 +5,9 @@ const cookieParser = require('cookie-parser');
 
 const config = require('./config');
 const { checkAdminLoginAllowed, recordAttempt, cleanupOldAttempts } = require('./lib/rateLimit');
+require('./db'); // schema + moutaki seed
+const clientsRoutes = require('./routes/clients');
+const { writeAudit } = require('./lib/audit');
 
 const app = express();
 const publicDir = path.join(__dirname, 'public');
@@ -95,20 +98,27 @@ app.post('/login', async (req, res) => {
   }
 
   const password = String(req.body.password || '');
+  if (!config.META_ADMIN_PASSWORD) {
+    await sleep(300);
+    return res.status(503).json({ error: 'META_ADMIN_PASSWORD δεν έχει οριστεί.' });
+  }
   const ok = passwordsMatch(password, config.META_ADMIN_PASSWORD);
   if (!ok) {
     recordAttempt({ ip, kind: 'admin_login', success: false });
+    writeAudit({ action: 'login.failed', detail: 'bad password', ip });
     console.warn(`[meta_admin_login] failed ip=${ip}`);
     await sleep(300);
     return res.status(401).json({ error: 'Λάθος κωδικός πρόσβασης.' });
   }
 
   recordAttempt({ ip, kind: 'admin_login', success: true });
+  writeAudit({ action: 'login.success', ip });
   res.cookie(SESSION_COOKIE, SESSION_VALUE, sessionCookieOptions(req));
   res.json({ ok: true });
 });
 
 app.post('/logout', (req, res) => {
+  writeAudit({ action: 'logout', ip: req.ip || null });
   res.clearCookie(SESSION_COOKIE, sessionCookieOptions(req));
   res.json({ ok: true });
 });
@@ -130,9 +140,18 @@ app.get('/api/me', (req, res) => {
   res.json({ ok: true, authenticated: true });
 });
 
+app.use('/api', clientsRoutes);
+
 cleanupOldAttempts();
 setInterval(cleanupOldAttempts, 60 * 60 * 1000);
 
-app.listen(BIND_PORT, BIND_HOST, () => {
+const server = app.listen(BIND_PORT, BIND_HOST, () => {
+  const addr = server.address();
+  const boundHost = addr && typeof addr === 'object' ? addr.address : BIND_HOST;
+  if (boundHost !== '127.0.0.1' && boundHost !== '::ffff:127.0.0.1') {
+    console.warn(
+      `[hardening] WARNING: process is listening on ${boundHost}:${BIND_PORT} — expected 127.0.0.1 only.`
+    );
+  }
   console.log(`Kollekta Meta-admin: http://${BIND_HOST}:${BIND_PORT}`);
 });
