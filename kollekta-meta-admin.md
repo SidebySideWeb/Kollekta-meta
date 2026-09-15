@@ -125,5 +125,28 @@ docker run -d --name kollekta_{subdomain} --restart unless-stopped \
 ### Audit log
 
 Πίνακας `audit_log`: actor (default `owner`), action, client_id, subdomain, detail, ip, at.
-Γράφεται για login, logout, create, provision start/retry/success/failed, archive.
+Γράφεται για login, logout, create, provision start/retry/success/failed, archive,
+plan.change / plan.change.failed / plan.change.health_failed.
+
+---
+
+## Πακέτα (`lib/plans.js`)
+
+| Plan | GB | Retention | Ετήσιο € | Features |
+|------|----|-----------|----------|----------|
+| basic | 10 | 12 μήνες | 300 | χωρίς κωδικούς / ετικέτες |
+| pro | 25 | 24 μήνες | 600 | pro+ |
+| business | 60 | άπειρο | 1100 | pro+ |
+| demo | 1 | 1 μήνας | 0 (εξαιρείται από revenue) | όπως basic |
+
+Το **demo** είναι εσωτερικό (trial για prospect) — όχι για τη δημόσια τιμολόγηση kollekta.gr.
+Στη λίστα / λεπτομέρεια εμφανίζεται badge `DEMO`.
+
+### Αλλαγή πακέτου (`POST /api/clients/:id/plan`)
+
+Μόνο για `status=active`. Ενημερώνει γραμμές στο `prod.env` (PLAN, QUOTA_GB,
+FEATURE_*, DEFAULT_RETENTION_MONTHS — όχι secrets/SMTP/STORAGE overrides),
+επαναδημιουργεί το container στο **ίδιο** image/port, healthcheck, μετά DB + audit.
+Επιβεβαίωση με πληκτρολόγηση subdomain.
+
 

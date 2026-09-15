@@ -20,6 +20,7 @@ const {
 } = require('../lib/provision');
 const { checklistForSubdomain } = require('../lib/postProvisionChecklist');
 const { archiveClient } = require('../lib/decommission');
+const { applyPlanChange } = require('../lib/planChange');
 const { writeAudit } = require('../lib/audit');
 
 const router = express.Router();
@@ -227,6 +228,21 @@ router.post('/clients/:id/archive', async (req, res) => {
     res.json(result);
   } catch (error) {
     return res.status(400).json({ error: error.message || 'Αποτυχία αρχειοθέτησης.' });
+  }
+});
+
+router.post('/clients/:id/plan', async (req, res) => {
+  try {
+    const result = await applyPlanChange(req.params.id, {
+      plan: req.body.plan,
+      annualPriceEur: req.body.annual_price_eur,
+      discountNote: req.body.discount_note,
+      confirmSubdomain: req.body.confirm_subdomain,
+      ip: req.ip || null,
+    });
+    res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || 'Αποτυχία αλλαγής πακέτου.' });
   }
 });
 

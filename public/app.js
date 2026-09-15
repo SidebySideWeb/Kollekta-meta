@@ -9,6 +9,7 @@ const STEP_LABELS = {
 };
 
 let plansById = {};
+let plansOrder = [];
 let clientsById = {};
 let subdomainTimer = null;
 let subdomainOk = false;
@@ -75,13 +76,48 @@ function showView(name) {
   $('view-detail').classList.toggle('hidden', name !== 'detail');
 }
 
-function renderPlanPreview(planId) {
+function fillPlanSelect(selectEl, selectedId) {
+  if (!selectEl) return;
+  const options = plansOrder.length ? plansOrder : Object.values(plansById);
+  if (!options.length) return;
+  selectEl.innerHTML = options
+    .map(
+      (p) =>
+        `<option value="${escapeHtml(p.id)}"${p.id === selectedId ? ' selected' : ''}>${escapeHtml(p.label)}</option>`
+    )
+    .join('');
+}
+
+function planBadgeHtml(planId) {
+  if (String(planId || '').toLowerCase() !== 'demo') return '';
+  return ' <span class="pill plan-demo" title="Εσωτερικό demo / trial">DEMO</span>';
+}
+
+function formatPlanCell(planId) {
   const plan = plansById[planId];
-  const el = $('plan-preview');
-  if (!plan) {
-    el.innerHTML = '';
-    return;
+  const label = plan ? plan.label : planId;
+  return `${escapeHtml(label)}${planBadgeHtml(planId)}`;
+}
+
+function formatPriceCell(client) {
+  const plan = plansById[client.plan];
+  const billable =
+    plan && plan.countsTowardRevenue !== undefined
+      ? plan.countsTowardRevenue
+      : Number(client.annual_price_eur) > 0;
+  if (!billable || client.plan === 'demo') {
+    return '<span class="muted">—</span>';
   }
+  const price = client.annual_price_eur != null ? `${client.annual_price_eur}€` : '—';
+  const note = client.discount_note
+    ? ` <span class="muted">(${escapeHtml(client.discount_note)})</span>`
+    : '';
+  return `${price}${note}`;
+}
+
+function planPreviewHtml(planId) {
+  const plan = plansById[planId];
+  if (!plan) return '';
   const retention =
     plan.retentionMonths == null ? 'άπειρο' : `${plan.retentionMonths}`;
   const features = [];
@@ -91,7 +127,7 @@ function renderPlanPreview(planId) {
     ? features.join(', ')
     : 'χωρίς κωδικούς / ετικέτες';
 
-  el.innerHTML = `
+  return `
     <p class="plan-preview-title">${escapeHtml(plan.label)} — προεπισκόπηση</p>
     <ul>
       <li>Χώρος: <strong>${plan.quotaGb} GB</strong></li>
@@ -101,6 +137,12 @@ function renderPlanPreview(planId) {
   `;
 }
 
+function renderPlanPreview(planId, targetId = 'plan-preview') {
+  const el = $(targetId);
+  if (!el) return;
+  el.innerHTML = planPreviewHtml(planId);
+}
+
 function syncPriceFromPlan() {
   const planId = $('plan-select').value;
   const plan = plansById[planId];
@@ -108,6 +150,21 @@ function syncPriceFromPlan() {
   $('price-input').value = plan.annualPriceEur;
   updateDiscountPreview();
   renderPlanPreview(planId);
+}
+
+function syncEditPlanForm() {
+  const planId = $('edit-plan-select')?.value;
+  const plan = plansById[planId];
+  if (!plan) return;
+  $('edit-price-input').value = plan.annualPriceEur;
+  renderPlanPreview(planId, 'edit-plan-preview');
+
+  const currentGb = Number($('edit-plan-form')?.dataset.currentGb || 0);
+  const warn = $('edit-downgrade-warn');
+  if (warn) {
+    const isDowngrade = plan.quotaGb < currentGb;
+    warn.classList.toggle('hidden', !isDowngrade);
+  }
 }
 
 function updateDiscountPreview() {
@@ -177,10 +234,6 @@ function renderClients(clients) {
   body.innerHTML = clients
     .map((c) => {
       clientsById[c.id] = c;
-      const price = c.annual_price_eur != null ? `${c.annual_price_eur}€` : '—';
-      const note = c.discount_note
-        ? ` <span class="muted">(${escapeHtml(c.discount_note)})</span>`
-        : '';
       const failedInline =
         c.status === 'failed' && c.provision_error
           ? `<div class="row-error">${escapeHtml(c.provision_error)}</div>`
@@ -191,9 +244,9 @@ function renderClients(clients) {
           ${failedInline}
         </td>
         <td><code>${escapeHtml(c.subdomain)}</code></td>
-        <td>${escapeHtml(c.plan)}</td>
+        <td>${formatPlanCell(c.plan)}</td>
         <td><span class="pill status-${escapeHtml(c.status)}">${escapeHtml(statusLabel(c.status))}</span></td>
-        <td>${price}${note}</td>
+        <td>${formatPriceCell(c)}</td>
         <td>${escapeHtml(formatDate(c.created_at))}</td>
       </tr>`;
     })
@@ -346,16 +399,51 @@ async function openClientDetail(id) {
         ? `<button type="button" class="btn btn-ghost" data-action="archive" data-id="${c.id}" data-subdomain="${escapeHtml(c.subdomain)}">Αρχειοθέτηση πελάτη</button>`
         : '';
 
+    const currentPlan = plansById[c.plan];
+    const currentGb = currentPlan ? currentPlan.quotaGb : 0;
+    const editPlanSection =
+      c.status === 'active'
+        ? `<section class="edit-plan-section" id="edit-plan-section">
+            <h3>Επεξεργασία πακέτου</h3>
+            <form id="edit-plan-form" class="client-form compact" data-id="${c.id}" data-subdomain="${escapeHtml(c.subdomain)}" data-current-gb="${currentGb}">
+              <div class="form-grid">
+                <label class="field">
+                  <span>Πακέτο</span>
+                  <select id="edit-plan-select" name="plan" required></select>
+                </label>
+                <label class="field">
+                  <span>Ετήσιο τίμημα (€)</span>
+                  <input type="number" name="annual_price_eur" id="edit-price-input" min="0" step="1" value="${c.annual_price_eur != null ? Number(c.annual_price_eur) : ''}">
+                </label>
+                <label class="field field-span">
+                  <span>Σημείωση έκπτωσης</span>
+                  <input type="text" name="discount_note" id="edit-discount-note" value="${escapeHtml(c.discount_note || '')}" placeholder="π.χ. -30% lifetime, testimonial">
+                </label>
+              </div>
+              <div class="plan-preview" id="edit-plan-preview" aria-live="polite"></div>
+              <p class="warn-banner hidden" id="edit-downgrade-warn" role="alert">
+                Το downgrade δεν διαγράφει αυτόματα αρχεία. Αν ο πελάτης έχει ήδη περισσότερα δεδομένα από το νέο όριο, το instance του θα δείξει υπέρβαση quota μέχρι να διαγράψει ο ίδιος περιεχόμενο.
+              </p>
+              <p id="edit-plan-msg" class="status-line hidden"></p>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-secondary" id="edit-plan-submit">Εφαρμογή αλλαγής πακέτου</button>
+              </div>
+            </form>
+          </section>`
+        : '';
+
     $('detail-panel').innerHTML = `
       <div class="detail-grid">
         <div>
           <h3>Στοιχεία</h3>
           <dl class="detail-dl">
             <dt>Subdomain</dt><dd><code>${escapeHtml(c.subdomain)}</code></dd>
-            <dt>Πακέτο</dt><dd>${escapeHtml(c.plan)}</dd>
+            <dt>Πακέτο</dt><dd>${formatPlanCell(c.plan)}</dd>
             <dt>Port</dt><dd>${c.port != null ? c.port : '—'}</dd>
-            <dt>Τίμημα</dt><dd>${c.annual_price_eur != null ? `${c.annual_price_eur}€` : '—'}${
-              c.discount_note ? ` <span class="muted">(${escapeHtml(c.discount_note)})</span>` : ''
+            <dt>Τίμημα</dt><dd>${formatPriceCell(c)}${
+              c.discount_note && c.plan === 'demo'
+                ? ` <span class="muted">(${escapeHtml(c.discount_note)})</span>`
+                : ''
             }</dd>
             <dt>Κατάσταση</dt><dd><span class="pill status-${escapeHtml(c.status)}">${escapeHtml(statusLabel(c.status))}</span></dd>
             <dt>Δημιουργία</dt><dd>${escapeHtml(c.created_at || '—')}</dd>
@@ -383,11 +471,65 @@ async function openClientDetail(id) {
         ${archiveBtn}
       </div>
 
+      ${editPlanSection}
+
       <h3>Provisioning log</h3>
       ${logsHtml}
     `;
+
+    if (c.status === 'active') {
+      fillPlanSelect($('edit-plan-select'), c.plan);
+      renderPlanPreview(c.plan, 'edit-plan-preview');
+      $('edit-plan-select')?.addEventListener('change', syncEditPlanForm);
+      $('edit-plan-form')?.addEventListener('submit', onEditPlanSubmit);
+    }
   } catch (err) {
     $('detail-panel').innerHTML = `<p class="status-line error">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function onEditPlanSubmit(e) {
+  e.preventDefault();
+  const form = e.target;
+  const id = form.dataset.id;
+  const subdomain = form.dataset.subdomain;
+  const plan = $('edit-plan-select').value;
+  const annual_price_eur = $('edit-price-input').value;
+  const discount_note = $('edit-discount-note').value;
+  const msg = $('edit-plan-msg');
+  msg.classList.add('hidden');
+
+  const confirmed = await openConfirmModal({
+    title: 'Επεξεργασία πακέτου',
+    body: `Θα ενημερωθεί το <code>prod.env</code> και θα επανεκκινηθεί το container του <strong>${escapeHtml(subdomain)}</strong> (ίδιο image, ίδιο port).<br>Πληκτρολόγησε <code>${escapeHtml(subdomain)}</code> για επιβεβαίωση.`,
+    subdomain,
+    requireExport: false,
+  });
+  if (!confirmed) return;
+
+  const submitBtn = $('edit-plan-submit');
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    const { data } = await api(`/api/clients/${id}/plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        plan,
+        annual_price_eur,
+        discount_note,
+        confirm_subdomain: confirmed.confirm_subdomain,
+      }),
+    });
+    msg.textContent = `Το πακέτο άλλαξε: ${data.oldPlan} → ${data.newPlan}.`;
+    msg.className = 'status-line ok';
+    msg.classList.remove('hidden');
+    await loadClients();
+    await openClientDetail(id);
+  } catch (err) {
+    msg.textContent = err.message || 'Αποτυχία αλλαγής πακέτου.';
+    msg.className = 'status-line error';
+    msg.classList.remove('hidden');
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -618,9 +760,11 @@ $('new-client-form')?.addEventListener('submit', async (e) => {
 (async function init() {
   try {
     const { data } = await api('/api/plans');
-    for (const plan of data.plans || []) {
+    plansOrder = data.plans || [];
+    for (const plan of plansOrder) {
       plansById[plan.id] = plan;
     }
+    fillPlanSelect($('plan-select'), 'basic');
     syncPriceFromPlan();
     await loadClients();
   } catch (err) {

@@ -217,6 +217,15 @@ body {
 .pill.status-draft { background: #F1F5F9; color: #475569; }
 .pill.status-archived { background: #E2E8F0; color: #64748B; }
 
+.pill.plan-demo {
+  background: #E8E8E8;
+  color: #64748B;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  vertical-align: middle;
+}
+
 .client-form {
   background: var(--white);
   border: 1px solid var(--slate-hairline);
@@ -766,6 +775,36 @@ body {
   background: var(--error-container);
   padding: 8px 10px;
   border-radius: var(--radius);
+}
+
+.status-line.ok {
+  color: #166534;
+  background: #DCFCE7;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+}
+
+.warn-banner {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  border-radius: var(--radius);
+  color: #92400E;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.edit-plan-section {
+  margin: 28px 0;
+}
+
+.edit-plan-section h3 {
+  margin: 0 0 12px;
+}
+
+.client-form.compact {
+  padding: 18px;
 }
 
 @media (max-width: 640px) {
