@@ -20,7 +20,7 @@ const {
 } = require('../lib/provision');
 const { checklistForSubdomain } = require('../lib/postProvisionChecklist');
 const { archiveClient } = require('../lib/decommission');
-const { applyPlanChange } = require('../lib/planChange');
+const { applyPlanChange, canChangePlan } = require('../lib/planChange');
 const { writeAudit } = require('../lib/audit');
 
 const router = express.Router();
@@ -64,6 +64,7 @@ router.get('/clients/:id/status', (req, res) => {
 router.get('/clients/:id', (req, res) => {
   const client = getClient(req.params.id);
   if (!client) return res.status(404).json({ error: 'Ο πελάτης δεν βρέθηκε.' });
+  const planChange = canChangePlan(client);
   res.json({
     client,
     logs: listLogs(client.id),
@@ -71,6 +72,8 @@ router.get('/clients/:id', (req, res) => {
     resumeStep: getResumeStep(client.id),
     adminUrl: `https://${client.subdomain}.kollekta.gr/admin`,
     checklist: checklistForSubdomain(client.subdomain),
+    canChangePlan: planChange.ok,
+    planChangeBlockReason: planChange.reason,
   });
 });
 
@@ -242,7 +245,9 @@ router.post('/clients/:id/plan', async (req, res) => {
     });
     res.json(result);
   } catch (error) {
-    return res.status(400).json({ error: error.message || 'Αποτυχία αλλαγής πακέτου.' });
+    const message = error && error.message ? error.message : 'Αποτυχία αλλαγής πακέτου.';
+    console.error('[plan.change]', req.params.id, message);
+    return res.status(400).json({ error: message });
   }
 });
 

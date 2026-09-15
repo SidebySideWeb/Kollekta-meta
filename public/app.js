@@ -401,8 +401,9 @@ async function openClientDetail(id) {
 
     const currentPlan = plansById[c.plan];
     const currentGb = currentPlan ? currentPlan.quotaGb : 0;
+    const allowPlanChange = data.canChangePlan !== false && c.status === 'active';
     const editPlanSection =
-      c.status === 'active'
+      c.status === 'active' && allowPlanChange
         ? `<section class="edit-plan-section" id="edit-plan-section">
             <h3>Επεξεργασία πακέτου</h3>
             <form id="edit-plan-form" class="client-form compact" data-id="${c.id}" data-subdomain="${escapeHtml(c.subdomain)}" data-current-gb="${currentGb}">
@@ -430,7 +431,12 @@ async function openClientDetail(id) {
               </div>
             </form>
           </section>`
-        : '';
+        : c.status === 'active' && data.planChangeBlockReason
+          ? `<section class="edit-plan-section">
+              <h3>Επεξεργασία πακέτου</h3>
+              <p class="status-line error">${escapeHtml(data.planChangeBlockReason)}</p>
+            </section>`
+          : '';
 
     $('detail-panel').innerHTML = `
       <div class="detail-grid">
@@ -477,7 +483,7 @@ async function openClientDetail(id) {
       ${logsHtml}
     `;
 
-    if (c.status === 'active') {
+    if (c.status === 'active' && allowPlanChange) {
       fillPlanSelect($('edit-plan-select'), c.plan);
       renderPlanPreview(c.plan, 'edit-plan-preview');
       $('edit-plan-select')?.addEventListener('change', syncEditPlanForm);
@@ -526,7 +532,8 @@ async function onEditPlanSubmit(e) {
     await loadClients();
     await openClientDetail(id);
   } catch (err) {
-    msg.textContent = err.message || 'Αποτυχία αλλαγής πακέτου.';
+    const text = err.message || 'Αποτυχία αλλαγής πακέτου.';
+    msg.textContent = text;
     msg.className = 'status-line error';
     msg.classList.remove('hidden');
     if (submitBtn) submitBtn.disabled = false;
