@@ -69,7 +69,7 @@ docker run -d --name kollekta_{subdomain} --restart unless-stopped \
   --env-file /srv/kollekta/instances/{subdomain}/prod.env \
   -v .../data:/app/data \
   -v .../uploads:/app/uploads \
-  -v .../logo:/app/logo \
+  -v .../logo:/app/public/logo \
   kollekta:latest
 ```
 
